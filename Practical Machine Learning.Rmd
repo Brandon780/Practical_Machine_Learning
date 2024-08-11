@@ -7,7 +7,263 @@ output:
     keep_md: yes
 ---
 
-##Synopsis
+#Synopsis
 
-En este proyecto, usarás datos de acelerómetros de seis participantes que realizaron levantamientos de pesas de manera correcta e incorrecta en cinco formas distintas. El objetivo es predecir la manera en la que se realizó el ejercicio, indicada por la variable classe en el conjunto de entrenamiento.
----
+### **`En este proyecto, usarás datos de acelerómetros de seis participantes que realizaron levantamientos de pesas de manera correcta e incorrecta en cinco formas distintas. El objetivo es predecir la manera en la que se realizó el ejercicio, indicada por la variable classe en el conjunto de entrenamiento`**.
+
+Los dispositivos de seguimiento personal, como Fitbit y Nike FuelBand, permiten medir la actividad física diaria. Sin embargo, medir solo la cantidad de actividad no siempre refleja la calidad de la misma.
+
+En este proyecto, utilizamos datos de acelerómetros en dispositivos colocados en el cinturón, el antebrazo, el brazo y la mancuerna de seis participantes que realizaron levantamientos de barra en cinco estilos diferentes. El objetivo es analizar estos datos para identificar patrones y evaluar la calidad de los levantamientos, tanto correctos como incorrectos.
+
+## *Descripción de los datos*
+
+La variable de salida es `classe`, un factor con 5 niveles que indican la forma en que se realizó el ejercicio:
+
+-   Clase A: Correctamente según la especificación.
+-   Clase B: Lanzando los codos hacia adelante.
+-   Clase C: Levantando la mancuerna solo hasta la mitad.
+-   Clase D: Bajando la mancuerna solo hasta la mitad.
+-   Clase E: Lanzando las caderas hacia adelante.
+
+```{r}
+# Variables de datos
+training.file   <- './data/pml-training.csv'
+test.cases.file <- './data/pml-testing.csv'
+training.url    <- 'http://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv'
+test.cases.url  <- 'http://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv'
+
+
+```
+
+#### Procesamiento de Datos Se descargan y procesan los datos. Se eliminan columnas irrelevantes y se omiten valores NA
+
+```{r}
+# Creación de directorios
+if (!file.exists("data")){
+  dir.create("data")
+}
+if (!file.exists("data/submission")){
+  dir.create("data/submission")
+}
+
+```
+
+```{r}
+
+
+# Cargar paquetes requeridos
+#if (!require("caret")) install.packages("caret", dependencies=TRUE)
+#if (!require("randomForest")) install.packages("randomForest", dependencies=TRUE)
+#if (!require("rpart")) install.packages("rpart", dependencies=TRUE)
+#if (!require("rpart.plot")) install.packages("rpart.plot", dependencies=TRUE)
+library(caret)
+library(randomForest)
+library(rpart)
+library(rpart.plot)
+
+
+```
+
+```{r}
+# Establecer semilla para la reproducibilidad
+set.seed(9999)
+```
+
+```{r}
+# Verificar si los archivos ya existen, si no, descargarlos
+if (!file.exists(training.file)) {
+  download.file(training.url, destfile = training.file)
+}
+if (!file.exists(test.cases.file)) {
+  download.file(test.cases.url, destfile = test.cases.file)
+}
+
+# Leer los datos desde los archivos locales
+#training <- read.csv(training.file, na.strings=c("NA","#DIV/0!", ""))
+#testing <- read.csv(test.cases.file, na.strings=c("NA", "#DIV/0!", ""))
+
+```
+
+```{r}
+training <- read.csv(training.file, na.strings=c("NA","#DIV/0!", ""))
+testing <- read.csv(test.cases.file, na.strings=c("NA", "#DIV/0!", ""))
+
+```
+
+```{r}
+# Eliminar columnas irrelevantes y omitir valores NA
+training <- training[, colSums(is.na(training)) == 0]
+testing <- testing[, colSums(is.na(testing)) == 0]
+
+```
+
+```{r}
+
+# Eliminar las primeras 7 columnas que no son necesarias
+training <- training[, -c(1:7)]
+testing <- testing[, -c(1:7)]
+```
+
+```{r}
+# Dividir datos para validación cruzada
+subSamples <- createDataPartition(y=training$classe, p=0.75, list=FALSE)
+subTraining <- training[subSamples, ] 
+subTesting <- training[-subSamples, ]
+
+```
+
+```{r}
+#subTesting$classe
+```
+
+```{r}
+table(subTraining$classe)
+
+```
+
+## Análisis Exploratorio
+
+#### *Visualizamos la distribución de la variable `classe` en el conjunto de entrenamiento.*
+
+```{r}
+# Calcular las frecuencias de cada valor en 'classe'
+frequencias <- table(subTraining$classe)
+
+# Crear el gráfico de barras
+barplot(frequencias,
+        col="orange",
+        main="Distribución de las Clases en el Conjunto de Entrenamiento",
+        xlab="Niveles de 'classe'",
+        ylab="Frecuencia",
+        ylim=c(0, max(frequencias) * 1.1)) # Ajustar el límite superior del eje y
+
+
+```
+
+```{r}
+library(rpart)
+library(caret) # Para confusionMatrix
+library(rpart.plot)
+
+```
+
+```{r}
+
+
+
+```
+
+## Modelos de Predicción
+
+#### *`Aplicamos dos modelos de predicción: Árbol de Decisión y Bosque Aleatorio`*.
+
+Árbol de Decisión
+
+```{r}
+# Ajuste del modelo de Árbol de Decisión
+modFitDT <- rpart(classe ~ ., data=subTraining, method="class")
+
+```
+
+```{r}
+# Predicción con Árbol de Decisión
+predictDT <- predict(modFitDT, subTesting, type = "class")
+
+
+```
+
+```{r}
+# Asegurarse de que 'subTesting$classe' sea un factor
+subTesting$classe <- factor(subTesting$classe)
+
+
+```
+
+```{r}
+# Asegurarse de que 'predictDT' sea un factor con los mismos niveles que 'subTesting$classe'
+predictDT <- factor(predictDT, levels = levels(subTesting$classe))
+
+
+```
+
+```{r}
+# Visualizar el Árbol de Decisión
+rpart.plot(modFitDT, main="Árbol de Decisión para Clasificación", extra=102, under=TRUE, faclen=0)
+
+```
+
+```{r}
+
+# Matriz de Confusión para Árbol de Decisión
+confusionMatrix(predictDT, subTesting$classe)
+```
+
+Bosque Aleatorio
+
+```{r}
+library(randomForest)
+
+# Asegurarse de que 'classe' sea un factor
+subTraining$classe <- factor(subTraining$classe)
+
+# Ajuste del modelo de Bosque Aleatorio
+modFitRF <- randomForest(classe ~ ., data=subTraining)
+
+# Ver el resumen del modelo para asegurarse de que no haya errores
+print(modFitRF)
+
+
+```
+
+```{r}
+subTraining$classe <- as.factor(subTraining$classe)
+```
+
+```{r}
+# Predicción con Bosque Aleatorio
+predictRF <- predict(modFitRF, subTesting, type = "class")
+
+
+```
+
+```{r}
+# Matriz de Confusión para Bosque Aleatorio
+confusionMatrix(predictRF, subTesting$classe)
+```
+
+Conclusion
+Result
+The Random Forest model demonstrates better performance compared to the Decision Tree. The accuracy for the Random Forest model was 99.57%, compared to 74.12% for the Decision Tree model. Therefore, the Random Forest model is chosen for the final prediction.
+
+Expected Out-of-Sample Error
+The expected out-of-sample error is estimated to be 0.43%. This is calculated as 1 - accuracy for the predictions made with the cross-validation set.
+
+
+
+```{r}
+# Predicción final en el conjunto de prueba
+predictSubmission <- predict(modFitRF, testing, type="class")
+predictSubmission
+
+# Función para escribir los archivos de salida para la presentación
+pml_write_files <- function(x){
+  n <- length(x)
+  for(i in 1:n){
+    filename <- paste0("./data/submission/problem_id_", i, ".txt")
+    write.table(x[i], file=filename, quote=FALSE, row.names=FALSE, col.names=FALSE)
+  }
+}
+
+# Generar archivos de salida
+pml_write_files(predictSubmission)
+
+```
+
+-------------------------------------------------------
+
+
+
+
+
+
+
